@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GableGrid — Business Automation & Data Solutions</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- GSAP + ScrollTrigger -->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>emailjs.init('8FHQ4gTR0ISrxB0aM')</script>
 <style>
@@ -253,12 +256,23 @@ tbody td{padding:1rem 1.25rem;font-size:.875rem;vertical-align:top}
   .tg{grid-template-columns:repeat(3,1fr)}
   thead th:nth-child(3),tbody td:nth-child(3){display:none}
 }
-.fu{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}
-.fu.vis{opacity:1;transform:none}
-.fu.d1{transition-delay:.1s}.fu.d2{transition-delay:.2s}.fu.d3{transition-delay:.3s}
+/* ── GSAP-ready: .fu no longer driven by CSS transitions ─────────── */
+.fu{will-change:transform,opacity}
+/* Progress bar */
+#gsap-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:9999;background:linear-gradient(90deg,var(--blue),var(--green-l));transform-origin:left center;transform:scaleX(0);pointer-events:none}
+/* Magnetic button wrapper */
+.mag-wrap{display:inline-block;will-change:transform}
+/* Tilt cards */
+.sc3,.pc{will-change:transform;transform-style:preserve-3d;perspective:800px}
+/* Split-text word spans */
+.word-wrap{overflow:hidden;display:inline-block;vertical-align:bottom}
+.word-inner{display:inline-block;will-change:transform}
 </style>
 </head>
 <body>
+
+<!-- Scroll progress bar -->
+<div id="gsap-progress"></div>
 
 <!-- ══════════ WEBSITE ══════════ -->
 <div id="website" class="page active">
@@ -453,13 +467,279 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const sb = createClient('https://qzrdnreiwhgxgchejbbr.supabase.co','sb_publishable_-C2arVIJRtnp28z_gnJvGg_k_3WCMP5')
 let rows=[]
 
+/* ══════════════════════════════════════════════
+   GSAP ANIMATIONS
+══════════════════════════════════════════════ */
+gsap.registerPlugin(ScrollTrigger)
+
+// ── 1. SCROLL PROGRESS BAR ────────────────────
+gsap.to('#gsap-progress', {
+  scaleX: 1,
+  ease: 'none',
+  scrollTrigger: {
+    trigger: document.body,
+    start: 'top top',
+    end: 'bottom bottom',
+    scrub: 0.3,
+  }
+})
+
+// ── 2. HERO SPLIT TEXT ────────────────────────
+function splitWords(el){
+  if(!el) return []
+  const words = el.innerHTML.split(/(\s+)/)
+  el.innerHTML = words.map(w =>
+    w.trim()
+      ? `<span class="word-wrap"><span class="word-inner">${w}</span></span>`
+      : w
+  ).join('')
+  return el.querySelectorAll('.word-inner')
+}
+
+const heroH1 = document.querySelector('.hero h1')
+const wordInners = splitWords(heroH1)
+
+// Set initial state
+gsap.set(wordInners, { yPercent: 110, opacity: 0 })
+
+// Animate hero content after a short delay
+const heroTl = gsap.timeline({ delay: 0.15 })
+
+// Eyebrow badge
+heroTl.from('.eyb', {
+  opacity: 0, y: 20, duration: 0.6, ease: 'power3.out'
+})
+// Words slide up
+heroTl.to(wordInners, {
+  yPercent: 0,
+  opacity: 1,
+  duration: 0.75,
+  stagger: 0.06,
+  ease: 'power4.out',
+  force3D: true,
+}, '-=0.3')
+// Sub text
+heroTl.from('.hero-sub', {
+  opacity: 0, y: 18, duration: 0.6, ease: 'power3.out'
+}, '-=0.4')
+// CTAs
+heroTl.from('.hact > *', {
+  opacity: 0, y: 14, duration: 0.5, stagger: 0.1, ease: 'power3.out'
+}, '-=0.35')
+// Upwork badge
+heroTl.from('.upwb', {
+  opacity: 0, y: 10, duration: 0.45, ease: 'power2.out'
+}, '-=0.25')
+// KPI stat cards
+heroTl.from('.sc2', {
+  opacity: 0, y: 30, scale: 0.92, duration: 0.6, stagger: 0.12, ease: 'back.out(1.4)', force3D: true
+}, '-=0.3')
+
+// ── 3. SCROLL-TRIGGERED STAGGER REVEALS ───────
+// Remove old intersection observer from CSS – handle with GSAP instead
+// Section-level .fu elements (headings/wrappers)
+document.querySelectorAll('.sec.fu, .csec .fu, .fu:not(.sc3):not(.pc):not(.psi)').forEach(el => {
+  if(el.closest('.hero')) return // skip hero, already animated
+  gsap.fromTo(el,
+    { opacity: 0, y: 32, force3D: true },
+    {
+      opacity: 1, y: 0, duration: 0.75, ease: 'power3.out',
+      scrollTrigger: {
+        trigger: el,
+        start: 'top 88%',
+        toggleActions: 'play none none none'
+      }
+    }
+  )
+})
+
+// Service cards (.sc3) — stagger within each grid
+document.querySelectorAll('.sg').forEach(grid => {
+  gsap.fromTo(grid.querySelectorAll('.sc3'),
+    { opacity: 0, y: 40, scale: 0.95, rotateZ: 2, force3D: true },
+    {
+      opacity: 1, y: 0, scale: 1, rotateZ: 0,
+      duration: 0.65, stagger: 0.1, ease: 'power3.out',
+      scrollTrigger: {
+        trigger: grid,
+        start: 'top 82%',
+        toggleActions: 'play none none none'
+      }
+    }
+  )
+})
+
+// Process steps (.psi)
+gsap.fromTo('.psi',
+  { opacity: 0, y: 36, scale: 0.94, rotateZ: -1.5, force3D: true },
+  {
+    opacity: 1, y: 0, scale: 1, rotateZ: 0,
+    duration: 0.6, stagger: 0.12, ease: 'back.out(1.2)',
+    scrollTrigger: {
+      trigger: '.ps',
+      start: 'top 82%',
+      toggleActions: 'play none none none'
+    }
+  }
+)
+
+// Portfolio cards (.pc)
+gsap.fromTo('.pc',
+  { opacity: 0, y: 44, scale: 0.93, rotateZ: 1.5, force3D: true },
+  {
+    opacity: 1, y: 0, scale: 1, rotateZ: 0,
+    duration: 0.7, stagger: 0.14, ease: 'power3.out',
+    scrollTrigger: {
+      trigger: '.pg',
+      start: 'top 82%',
+      toggleActions: 'play none none none'
+    }
+  }
+)
+
+// ── 4. KPI CARD PARALLAX ON MOUSE MOVE ────────
+const kpiCards = document.querySelectorAll('.sc2')
+document.querySelector('.hero')?.addEventListener('mousemove', e => {
+  const rect = document.querySelector('.hero').getBoundingClientRect()
+  const cx = (e.clientX - rect.left) / rect.width  - 0.5
+  const cy = (e.clientY - rect.top)  / rect.height - 0.5
+  kpiCards.forEach((card, i) => {
+    const depth = 0.6 + i * 0.15
+    gsap.to(card, {
+      x: cx * 18 * depth,
+      y: cy * 12 * depth,
+      rotateX: -cy * 5,
+      rotateY: cx * 5,
+      duration: 0.6,
+      ease: 'power2.out',
+      force3D: true,
+      overwrite: 'auto'
+    })
+  })
+})
+document.querySelector('.hero')?.addEventListener('mouseleave', () => {
+  kpiCards.forEach(card => {
+    gsap.to(card, { x: 0, y: 0, rotateX: 0, rotateY: 0, duration: 0.8, ease: 'power3.out', force3D: true })
+  })
+})
+
+// ── 5. MAGNETIC BUTTONS ───────────────────────
+function addMagnetic(sel, strength = 0.35){
+  document.querySelectorAll(sel).forEach(btn => {
+    btn.addEventListener('mousemove', e => {
+      const r = btn.getBoundingClientRect()
+      const dx = e.clientX - (r.left + r.width  / 2)
+      const dy = e.clientY - (r.top  + r.height / 2)
+      gsap.to(btn, {
+        x: dx * strength,
+        y: dy * strength,
+        duration: 0.35,
+        ease: 'power2.out',
+        force3D: true,
+        overwrite: 'auto'
+      })
+    })
+    btn.addEventListener('mouseleave', () => {
+      gsap.to(btn, { x: 0, y: 0, duration: 0.55, ease: 'elastic.out(1, 0.55)', force3D: true })
+    })
+  })
+}
+addMagnetic('.nbtn', 0.4)
+addMagnetic('.bbl',  0.38)
+addMagnetic('.fsb',  0.25)
+
+// ── 6. 3D TILT + GLOW ON CARDS (all card types) ──────────────────
+function addTilt(sel, opts = {}){
+  const {
+    tilt    = 12,       // max rotation degrees
+    scale   = 1.025,   // hover scale
+    glowRgb = '26,86,219', // RGB for glow colour
+    glowAmt = 0.16,    // glow opacity at peak
+    dur     = 0.35,    // move duration
+    outDur  = 0.55,    // release duration
+    shadow  = true     // lift shadow on hover
+  } = opts
+
+  document.querySelectorAll(sel).forEach(card => {
+    // Ensure card has relative positioning for the glow child
+    if(getComputedStyle(card).position === 'static') card.style.position = 'relative'
+    card.style.willChange = 'transform'
+    card.style.transformStyle = 'preserve-3d'
+
+    // Inject glow layer
+    const glowEl = document.createElement('div')
+    glowEl.style.cssText = `
+      position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+      opacity:0;transition:opacity .3s;z-index:0;
+    `
+    card.appendChild(glowEl)
+
+    card.addEventListener('mousemove', e => {
+      const r  = card.getBoundingClientRect()
+      const px = (e.clientX - r.left) / r.width
+      const py = (e.clientY - r.top)  / r.height
+      const rx = (py - 0.5) * -tilt
+      const ry = (px - 0.5) *  tilt
+
+      gsap.to(card, {
+        rotateX: rx, rotateY: ry,
+        scale,
+        duration: dur,
+        ease: 'power2.out',
+        force3D: true,
+        overwrite: 'auto'
+      })
+
+      if(shadow){
+        card.style.boxShadow = `
+          ${ry * -0.6}px ${rx * 0.6}px 32px rgba(${glowRgb},0.14),
+          0 8px 24px rgba(10,22,40,0.07)
+        `
+      }
+
+      glowEl.style.background = `radial-gradient(circle at ${px*100}% ${py*100}%, rgba(${glowRgb},${glowAmt}) 0%, transparent 62%)`
+      glowEl.style.opacity = '1'
+    })
+
+    card.addEventListener('mouseleave', () => {
+      gsap.to(card, {
+        rotateX: 0, rotateY: 0, scale: 1,
+        duration: outDur,
+        ease: 'power3.out',
+        force3D: true,
+        overwrite: 'auto'
+      })
+      glowEl.style.opacity = '0'
+      if(shadow) card.style.boxShadow = ''
+    })
+  })
+}
+
+// Service cards — standard blue glow, full tilt
+addTilt('.sc3', { tilt: 12, scale: 1.028, glowRgb: '26,86,219' })
+
+// Portfolio cards — gentler tilt (taller cards), colour-matched glow
+addTilt('.pc:not(.ft)',  { tilt: 9,  scale: 1.022, glowRgb: '26,86,219'  })
+addTilt('.pc.ft',        { tilt: 5,  scale: 1.015, glowRgb: '26,86,219'  })
+
+// KPI stat cards — snappy, blue glow
+addTilt('.sc2', { tilt: 14, scale: 1.04, glowRgb: '26,86,219', dur: 0.28 })
+
+// Process step cards — subtle blue-info tint
+addTilt('.psi', { tilt: 10, scale: 1.025, glowRgb: '26,86,219', glowAmt: 0.1 })
+
+// Tool chip cards — tight tilt, strong scale since they're small
+addTilt('.tc',  { tilt: 16, scale: 1.06,  glowRgb: '26,86,219', dur: 0.25, outDur: 0.45 })
+
+/* ══════════════════════════════════════════════
+   EXISTING FEATURES (UNTOUCHED)
+══════════════════════════════════════════════ */
+
 // PAGE NAV
 window.goAdmin=()=>{ document.getElementById('website').classList.remove('active'); document.getElementById('admin').classList.add('active'); window.scrollTo(0,0); sb.auth.getSession().then(({data:{session}})=>{ if(session) showDash() }) }
 window.goWebsite=()=>{ document.getElementById('admin').classList.remove('active'); document.getElementById('website').classList.add('active'); window.scrollTo(0,0) }
 
-// SCROLL + MAIN NAV
-const io=new IntersectionObserver(e=>e.forEach(v=>{ if(v.isIntersecting) v.target.classList.add('vis') }),{threshold:.1})
-document.querySelectorAll('.fu').forEach(e=>io.observe(e))
+// SCROLL + MAIN NAV (intersection observer removed — GSAP handles reveals now)
 window.addEventListener('scroll',()=>document.getElementById('nv').classList.toggle('sc',scrollY>40))
 window.togNav=()=>{ const l=document.querySelector('.nl'); const o=l.style.display==='flex'; l.style.cssText=o?'':'display:flex;flex-direction:column;position:fixed;top:68px;left:0;right:0;background:#fff;padding:1.5rem 5vw;gap:1.25rem;border-bottom:1px solid var(--bdr);z-index:199;box-shadow:0 8px 24px rgba(0,0,0,.08)' }
 
